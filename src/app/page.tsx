@@ -5,7 +5,7 @@ import { useApp } from "@/context/AppContext";
 import { getWeekDates, formatDateShort, formatTime, timeToMinutes, todayStr } from "@/lib/availability";
 
 export default function Dashboard() {
-  const { events, freeSlots, exports, weekOffset, setWeekOffset, calendars } = useApp();
+  const { events, freeSlots, exports, weekOffset, setWeekOffset, calendars, settings } = useApp();
 
   const calendarColorMap = new Map(calendars.map((c) => [c.id, c.color]));
 
@@ -25,7 +25,12 @@ export default function Dashboard() {
     <div className="mx-auto max-w-5xl px-6 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-        <p className="mt-1 text-slate-500">Your week at a glance</p>
+        <p className="mt-1 text-slate-500">
+          Your week at a glance &middot; Free between{" "}
+          <span className="font-medium text-indigo-600">
+            {formatTime(settings.workingHoursStart)}–{formatTime(settings.workingHoursEnd)}
+          </span>
+        </p>
       </div>
 
       {/* Stats */}
@@ -128,11 +133,14 @@ export default function Dashboard() {
                   {dayEvents.length > 3 && (
                     <p className="text-xs text-slate-400">+{dayEvents.length - 3} more</p>
                   )}
-                  {daySlots.length > 0 && (
-                    <div className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700">
-                      {daySlots.length} free slot{daySlots.length !== 1 && "s"}
+                  {daySlots.map((s, i) => (
+                    <div
+                      key={`free-${i}`}
+                      className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700 truncate"
+                    >
+                      {formatTime(s.startTime)}–{formatTime(s.endTime)}
                     </div>
-                  )}
+                  ))}
                 </div>
               </Link>
             );
