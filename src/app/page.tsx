@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
-import { getWeekDates, formatDateShort, formatTime, timeToMinutes } from "@/lib/availability";
+import { getWeekDates, formatDateShort, formatTime, timeToMinutes, todayStr } from "@/lib/availability";
 
 export default function Dashboard() {
   const { events, freeSlots, exports, weekOffset, setWeekOffset, calendars } = useApp();
@@ -91,7 +91,7 @@ export default function Dashboard() {
           {weekDates.map((date) => {
             const dayEvents = events.filter((e) => e.date === date);
             const daySlots = freeSlots.filter((s) => s.date === date && s.available);
-            const isToday = date === new Date().toISOString().split("T")[0];
+            const isToday = date === todayStr();
 
             return (
               <Link

@@ -3,7 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
-import { formatTime, timeToMinutes, formatDateShort } from "@/lib/availability";
+import { formatTime, timeToMinutes, formatDateShort, localDateStr } from "@/lib/availability";
 
 export default function DayPage({ params }: { params: Promise<{ date: string }> }) {
   const { date } = use(params);
@@ -36,7 +36,7 @@ export default function DayPage({ params }: { params: Promise<{ date: string }> 
     return ((e - s) / totalMinutes) * 100;
   };
 
-  const displayDate = new Date(date + "T00:00:00");
+  const displayDate = new Date(date + "T12:00:00"); // noon avoids day-boundary issues
   const fullDate = displayDate.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -45,12 +45,12 @@ export default function DayPage({ params }: { params: Promise<{ date: string }> 
   });
 
   // Navigate to prev/next day
-  const prevDay = new Date(displayDate);
+  const prevDay = new Date(date + "T12:00:00");
   prevDay.setDate(prevDay.getDate() - 1);
-  const nextDay = new Date(displayDate);
+  const nextDay = new Date(date + "T12:00:00");
   nextDay.setDate(nextDay.getDate() + 1);
-  const prevDate = prevDay.toISOString().split("T")[0];
-  const nextDate = nextDay.toISOString().split("T")[0];
+  const prevDate = localDateStr(prevDay);
+  const nextDate = localDateStr(nextDay);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">

@@ -1,5 +1,15 @@
 import { CalEvent, FreeSlot, Settings } from "./types";
 
+// Helper: format a local Date as YYYY-MM-DD without going through UTC
+export function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Helper: get today's date string in local time
+export function todayStr(): string {
+  return localDateStr(new Date());
+}
+
 export function generateFreeSlots(
   events: CalEvent[],
   settings: Settings,
@@ -96,12 +106,12 @@ export function getWeekDates(referenceDate: Date): string[] {
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    dates.push(d.toISOString().split("T")[0]);
+    dates.push(localDateStr(d));
   }
   return dates;
 }
 
 export function formatDateShort(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
+  const d = new Date(dateStr + "T12:00:00"); // noon avoids any day-boundary issues
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }

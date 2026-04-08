@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
-import { formatTime, formatDateShort, generateFreeSlots } from "@/lib/availability";
+import { formatTime, formatDateShort, generateFreeSlots, localDateStr, todayStr } from "@/lib/availability";
 import Link from "next/link";
 
 export default function ReviewPage() {
@@ -25,7 +25,7 @@ export default function ReviewPage() {
     slotsByDate[slot.date].push(slot);
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayStr();
   const dates = Object.keys(slotsByDate).filter((d) => d >= today).sort();
 
   const generateText = () => {
@@ -80,13 +80,10 @@ export default function ReviewPage() {
       // Step 2: Match slots CLIENT-SIDE (correct timezone)
       // Extract ALL unique dates from the W2M event
       const allSlots = slotsData.slots as number[];
-      const todayStr = new Date().toISOString().split("T")[0];
+      const now = todayStr();
       const w2mDates = [...new Set(
-        allSlots.filter(Boolean).map((ts) => {
-          const d = new Date(ts * 1000);
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        })
-      )].filter((d) => d >= todayStr).sort();
+        allSlots.filter(Boolean).map((ts) => localDateStr(new Date(ts * 1000)))
+      )].filter((d) => d >= now).sort();
 
       // Generate fresh free slots for ALL W2M dates (not just current week)
       const myAvailableSlots = generateFreeSlots(events, settings, w2mDates).filter((s) => s.available);
@@ -98,8 +95,8 @@ export default function ReviewPage() {
           fullAvailability += "0";
           continue;
         }
-        const d = new Date(ts * 1000);
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const d = new Date(ts * 1000); // browser interprets in local timezone
+        const dateStr = localDateStr(d);
         const timeMinutes = d.getHours() * 60 + d.getMinutes();
 
         let isAvailable = false;
@@ -123,8 +120,8 @@ export default function ReviewPage() {
 
       if (changedSlots.length === 0) {
         const freeDates = [...new Set(myAvailableSlots.map((s) => s.date))].join(", ");
-        const w2mStart = new Date(allSlots.find(Boolean)! * 1000).toLocaleDateString();
-        const w2mEnd = new Date(allSlots[allSlots.length - 1] * 1000).toLocaleDateString();
+        const w2mStart = formatDateShort(localDateStr(new Date(allSlots.find(Boolean)! * 1000)));
+        const w2mEnd = formatDateShort(localDateStr(new Date(allSlots[allSlots.length - 1] * 1000)));
         setW2mResult({
           success: false,
           message: `No matching slots. Your free slots: ${freeDates || "none"}. When2Meet: ${w2mStart} – ${w2mEnd}.`,
