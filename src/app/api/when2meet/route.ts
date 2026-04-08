@@ -65,39 +65,60 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "submit") {
-      // W2M expects:
-      // - slots: comma-separated timestamps of the slots being changed
-      // - availability: binary string for ALL slots (full state)
-      // - ChangeToAvailable: true
-      const { eventId, userId, password, changedSlots, fullAvailability } = body;
+      // W2M needs TWO requests:
+      // 1. ChangeToAvailable=true  → mark available slots
+      // 2. ChangeToAvailable=false → CLEAR unavailable slots (removes old stale data)
+      const { eventId, userId, password, availableSlots, unavailableSlots, fullAvailability } = body;
       const numericId = eventId.split("-")[0];
 
-      const params = new URLSearchParams({
-        person: userId,
-        event: numericId,
-        slots: changedSlots.join(","),
-        availability: fullAvailability,
-        password: password || "",
-        ChangeToAvailable: "true",
-      });
+      // First: clear unavailable slots
+      if (unavailableSlots && unavailableSlots.length > 0) {
+        const clearParams = new URLSearchParams({
+          person: userId,
+          event: numericId,
+          slots: unavailableSlots.join(","),
+          availability: fullAvailability,
+          password: password || "",
+          ChangeToAvailable: "false",
+        });
 
-      const res = await fetch("https://www.when2meet.com/SaveTimes.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString(),
-      });
+        await fetch("https://www.when2meet.com/SaveTimes.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: clearParams.toString(),
+        });
+      }
 
-      if (!res.ok) {
-        const text = await res.text();
-        return NextResponse.json(
-          { error: `Save failed (${res.status}): ${text}` },
-          { status: 502 }
-        );
+      // Then: set available slots
+      if (availableSlots && availableSlots.length > 0) {
+        const setParams = new URLSearchParams({
+          person: userId,
+          event: numericId,
+          slots: availableSlots.join(","),
+          availability: fullAvailability,
+          password: password || "",
+          ChangeToAvailable: "true",
+        });
+
+        const res = await fetch("https://www.when2meet.com/SaveTimes.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: setParams.toString(),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          return NextResponse.json(
+            { error: `Save failed (${res.status}): ${text}` },
+            { status: 502 }
+          );
+        }
       }
 
       return NextResponse.json({
         success: true,
-        slotsChanged: changedSlots.length,
+        available: availableSlots?.length || 0,
+        unavailable: unavailableSlots?.length || 0,
       });
     }
 

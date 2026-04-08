@@ -87,8 +87,9 @@ export default function ReviewPage() {
 
       // Generate fresh free slots for ALL W2M dates (not just current week)
       const myAvailableSlots = generateFreeSlots(events, settings, w2mDates).filter((s) => s.available);
-      const changedSlots: number[] = []; // timestamps of slots we're marking available
-      let fullAvailability = ""; // "1" or "0" for every slot
+      const availableSlots: number[] = [];
+      const unavailableSlots: number[] = [];
+      let fullAvailability = "";
 
       for (const ts of allSlots) {
         if (!ts) {
@@ -111,14 +112,15 @@ export default function ReviewPage() {
         }
 
         if (isAvailable) {
-          changedSlots.push(ts);
+          availableSlots.push(ts);
           fullAvailability += "1";
         } else {
+          unavailableSlots.push(ts);
           fullAvailability += "0";
         }
       }
 
-      if (changedSlots.length === 0) {
+      if (availableSlots.length === 0) {
         const freeDates = [...new Set(myAvailableSlots.map((s) => s.date))].join(", ");
         const w2mStart = formatDateShort(localDateStr(new Date(allSlots.find(Boolean)! * 1000)));
         const w2mEnd = formatDateShort(localDateStr(new Date(allSlots[allSlots.length - 1] * 1000)));
@@ -144,8 +146,8 @@ export default function ReviewPage() {
         return;
       }
 
-      // Step 4: Submit with full binary availability string
-      setW2mResult({ success: true, message: `Submitting ${changedSlots.length} available slots...` });
+      // Step 4: Submit — first clears old availability, then sets new
+      setW2mResult({ success: true, message: `Setting ${availableSlots.length} available, clearing ${unavailableSlots.length} unavailable...` });
       const submitRes = await fetch("/api/when2meet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -154,7 +156,8 @@ export default function ReviewPage() {
           eventId,
           userId: loginData.userId,
           password: w2mPassword,
-          changedSlots,
+          availableSlots,
+          unavailableSlots,
           fullAvailability,
         }),
       });
@@ -163,7 +166,7 @@ export default function ReviewPage() {
       if (submitRes.ok) {
         setW2mResult({
           success: true,
-          message: `Done! Marked ${submitData.slotsChanged} slots as available on When2Meet. Refresh the When2Meet page to see "${w2mName}".`,
+          message: `Done! ${submitData.available} slots available, ${submitData.unavailable} cleared. Refresh When2Meet to see "${w2mName}".`,
         });
         confirmExport("when2meet");
       } else {
