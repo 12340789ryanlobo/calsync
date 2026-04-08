@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
-import { formatTime, formatDateShort } from "@/lib/availability";
+import { formatTime, formatDateShort, generateFreeSlots } from "@/lib/availability";
 import Link from "next/link";
 
 export default function ReviewPage() {
-  const { freeSlots, exports, confirmExport, events } = useApp();
+  const { freeSlots, exports, confirmExport, events, settings } = useApp();
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
 
   // When2Meet auto-fill state
@@ -78,10 +78,18 @@ export default function ReviewPage() {
       }
 
       // Step 2: Match slots CLIENT-SIDE (correct timezone)
-      // Build full binary availability string for ALL slots (W2M requires this)
+      // Extract ALL unique dates from the W2M event
       const allSlots = slotsData.slots as number[];
       const todayStr = new Date().toISOString().split("T")[0];
-      const myAvailableSlots = freeSlots.filter((s) => s.available && s.date >= todayStr);
+      const w2mDates = [...new Set(
+        allSlots.filter(Boolean).map((ts) => {
+          const d = new Date(ts * 1000);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        })
+      )].filter((d) => d >= todayStr).sort();
+
+      // Generate fresh free slots for ALL W2M dates (not just current week)
+      const myAvailableSlots = generateFreeSlots(events, settings, w2mDates).filter((s) => s.available);
       const changedSlots: number[] = []; // timestamps of slots we're marking available
       let fullAvailability = ""; // "1" or "0" for every slot
 
