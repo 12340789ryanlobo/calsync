@@ -25,7 +25,8 @@ export default function ReviewPage() {
     slotsByDate[slot.date].push(slot);
   }
 
-  const dates = Object.keys(slotsByDate).sort();
+  const today = new Date().toISOString().split("T")[0];
+  const dates = Object.keys(slotsByDate).filter((d) => d >= today).sort();
 
   const generateText = () => {
     let text = `My availability (via CalSync):\n\n`;
@@ -79,7 +80,8 @@ export default function ReviewPage() {
       // Step 2: Match slots CLIENT-SIDE (correct timezone)
       // Build full binary availability string for ALL slots (W2M requires this)
       const allSlots = slotsData.slots as number[];
-      const myAvailableSlots = freeSlots.filter((s) => s.available);
+      const todayStr = new Date().toISOString().split("T")[0];
+      const myAvailableSlots = freeSlots.filter((s) => s.available && s.date >= todayStr);
       const changedSlots: number[] = []; // timestamps of slots we're marking available
       let fullAvailability = ""; // "1" or "0" for every slot
 
