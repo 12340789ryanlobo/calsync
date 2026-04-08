@@ -37,16 +37,21 @@ export function generateFreeSlots(
     // Find gaps in working hours
     let cursor = workStart;
     for (const block of merged) {
+      // Skip blocks entirely after working hours
+      if (block.start >= workEnd) break;
+
       const blockStart = Math.max(block.start - buffer, workStart);
-      if (cursor < blockStart) {
+      // Clamp free slot end to working hours
+      const freeEnd = Math.min(blockStart, workEnd);
+      if (cursor < freeEnd) {
         slots.push({
           date,
           startTime: minutesToTime(cursor),
-          endTime: minutesToTime(blockStart),
+          endTime: minutesToTime(freeEnd),
           available: true,
         });
       }
-      cursor = Math.max(cursor, block.end + buffer);
+      cursor = Math.max(cursor, Math.min(block.end + buffer, workEnd));
     }
 
     if (cursor < workEnd) {
