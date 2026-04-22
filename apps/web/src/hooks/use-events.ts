@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
 import type { CalEvent, EventRow } from "@/lib/types";
-import { useSupabase } from "@/lib/supabase";
 
 // Normalize DB row (timestamptz) into existing CalEvent shape (YYYY-MM-DD + HH:MM local).
 function rowToCalEvent(row: EventRow): CalEvent {
@@ -24,58 +22,39 @@ function rowToCalEvent(row: EventRow): CalEvent {
   };
 }
 
+const POLL_MS = 30_000;
+
 export function useEvents(): { events: CalEvent[]; loading: boolean; error: string | null } {
-  const supabase = useSupabase();
-  const { userId } = useAuth();
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabase || !userId) return;
     let cancelled = false;
 
-    (async () => {
-      const { data, error } = await supabase
-        .from("events")
-        .select("*")
-        .order("start_at", { ascending: true });
-      if (cancelled) return;
-      if (error) setError(error.message);
-      else setEvents((data ?? []).map(rowToCalEvent));
-      setLoading(false);
-    })();
+    async function fetchEvents() {
+      try {
+        const res = await fetch("/api/events", { cache: "no-store" });
+        if (!res.ok) throw new Error(`events fetch failed: ${res.status}`);
+        const { events: rows } = (await res.json()) as { events: EventRow[] };
+        if (cancelled) return;
+        setEvents(rows.map(rowToCalEvent));
+        setError(null);
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
 
-    const channel = supabase
-      .channel(`events-${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "events", filter: `user_id=eq.${userId}` },
-        (payload) => {
-          setEvents((prev) => {
-            if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-              const next = rowToCalEvent(payload.new as EventRow);
-              const idx = prev.findIndex((e) => e.id === next.id);
-              if (idx === -1) return [...prev, next];
-              const copy = [...prev];
-              copy[idx] = next;
-              return copy;
-            }
-            if (payload.eventType === "DELETE") {
-              const oldId = (payload.old as EventRow).id;
-              return prev.filter((e) => e.id !== oldId);
-            }
-            return prev;
-          });
-        },
-      )
-      .subscribe();
+    fetchEvents();
+    const handle = setInterval(fetchEvents, POLL_MS);
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      clearInterval(handle);
     };
-  }, [supabase, userId]);
+  }, []);
 
   return { events, loading, error };
 }

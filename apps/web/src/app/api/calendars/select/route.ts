@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getUserSupabase } from "@/lib/supabase-server";
+import { getServiceSupabase } from "@/lib/supabase-server";
 
 interface SelectBody {
   calendars: { googleCalendarId: string; name: string; color?: string | null }[];
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const supa = await getUserSupabase();
+  const supa = getServiceSupabase();
   const rows = body.calendars.map((c) => ({
     user_id: userId,
     google_calendar_id: c.googleCalendarId,

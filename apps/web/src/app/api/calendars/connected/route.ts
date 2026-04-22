@@ -1,18 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getServiceSupabase } from "@/lib/supabase-server";
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
-
-  const { id } = await params;
   const supa = getServiceSupabase();
-  const { error } = await supa
+  const { data, error } = await supa
     .from("connected_calendars")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", userId);
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ calendars: data ?? [] });
 }

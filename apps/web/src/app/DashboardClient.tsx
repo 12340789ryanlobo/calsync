@@ -6,7 +6,6 @@ import type { ConnectedCalendarRow } from "@/lib/types";
 import { useEvents } from "@/hooks/use-events";
 import { useSettings } from "@/hooks/use-settings";
 import { useFreeSlots } from "@/hooks/use-free-slots";
-import { useSupabase } from "@/lib/supabase";
 import { getWeekDates, formatDateShort, formatTime, timeToMinutes, todayStr } from "@/lib/availability";
 
 export default function DashboardClient() {
@@ -14,22 +13,20 @@ export default function DashboardClient() {
   const { events } = useEvents();
   const { settings } = useSettings();
   const freeSlots = useFreeSlots(events, settings, weekOffset);
-  const supabase = useSupabase();
   const [calendars, setCalendars] = useState<ConnectedCalendarRow[]>([]);
 
   useEffect(() => {
-    if (!supabase) return;
     let cancelled = false;
-    supabase
-      .from("connected_calendars")
-      .select("*")
-      .then(({ data }) => {
-        if (!cancelled && data) setCalendars(data);
-      });
+    fetch("/api/calendars/connected")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.calendars)) setCalendars(data.calendars);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, []);
 
   const calendarColorMap = new Map(calendars.map((c) => [c.google_calendar_id, c.color]));
 
