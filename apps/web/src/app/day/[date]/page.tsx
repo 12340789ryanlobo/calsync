@@ -2,10 +2,42 @@
 
 import { use, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import type { ConnectedCalendarRow } from "@/lib/types";
+import type { CalEvent, ConnectedCalendarRow } from "@/lib/types";
 import { useEvents } from "@/hooks/use-events";
 import { useSettings } from "@/hooks/use-settings";
 import { generateFreeSlots, formatTime, timeToMinutes, formatDateShort, localDateStr } from "@/lib/availability";
+
+// Lay out events into side-by-side columns when they overlap in time.
+// Returns each event with (col, cols) so the caller can compute left/width.
+function layoutEvents(events: CalEvent[]): { event: CalEvent; col: number; cols: number }[] {
+  const sorted = [...events].sort((a, b) => {
+    if (a.startTime !== b.startTime) return a.startTime.localeCompare(b.startTime);
+    return b.endTime.localeCompare(a.endTime);
+  });
+  const placed: { event: CalEvent; col: number; cols: number }[] = [];
+  for (const event of sorted) {
+    const used = new Set<number>();
+    for (const p of placed) {
+      if (p.event.startTime < event.endTime && p.event.endTime > event.startTime) {
+        used.add(p.col);
+      }
+    }
+    let col = 0;
+    while (used.has(col)) col++;
+    placed.push({ event, col, cols: 0 });
+  }
+  // For each event, cols = (max col among overlapping events) + 1.
+  for (const p of placed) {
+    let maxCol = p.col;
+    for (const q of placed) {
+      if (q.event.startTime < p.event.endTime && q.event.endTime > p.event.startTime) {
+        if (q.col > maxCol) maxCol = q.col;
+      }
+    }
+    p.cols = maxCol + 1;
+  }
+  return placed;
+}
 
 export default function DayPage({ params }: { params: Promise<{ date: string }> }) {
   const { date } = use(params);
@@ -136,28 +168,33 @@ export default function DayPage({ params }: { params: Promise<{ date: string }> 
                 );
               })}
 
-              {/* Busy blocks */}
-              {dayEvents.map((event) => {
-                const color = calendarColorMap.get(event.calendarId) || "#ef4444";
-                return (
-                  <div
-                    key={event.id}
-                    className="absolute left-14 right-2 rounded-lg border px-3 py-1.5 overflow-hidden"
-                    style={{
-                      top: `${toPercent(event.startTime)}%`,
-                      height: `${heightPercent(event.startTime, event.endTime)}%`,
-                      minHeight: "24px",
-                      backgroundColor: `${color}18`,
-                      borderColor: `${color}40`,
-                    }}
-                  >
-                    <p className="text-xs font-semibold truncate" style={{ color }}>{event.title}</p>
-                    <p className="text-xs" style={{ color: `${color}bb` }}>
-                      {formatTime(event.startTime)} &ndash; {formatTime(event.endTime)}
-                    </p>
-                  </div>
-                );
-              })}
+              {/* Busy blocks — positioned in side-by-side columns when overlapping */}
+              <div className="absolute left-14 right-2 top-0 bottom-0 pointer-events-none">
+                {layoutEvents(dayEvents).map(({ event, col, cols }) => {
+                  const color = calendarColorMap.get(event.calendarId) || "#ef4444";
+                  const widthPct = 100 / cols;
+                  return (
+                    <div
+                      key={event.id}
+                      className="absolute rounded-lg border px-2 py-1 overflow-hidden pointer-events-auto"
+                      style={{
+                        top: `${toPercent(event.startTime)}%`,
+                        height: `${heightPercent(event.startTime, event.endTime)}%`,
+                        left: `calc(${col * widthPct}% + 2px)`,
+                        width: `calc(${widthPct}% - 4px)`,
+                        minHeight: "24px",
+                        backgroundColor: `${color}18`,
+                        borderColor: `${color}40`,
+                      }}
+                    >
+                      <p className="text-xs font-semibold truncate" style={{ color }}>{event.title}</p>
+                      <p className="text-xs truncate" style={{ color: `${color}bb` }}>
+                        {formatTime(event.startTime)} &ndash; {formatTime(event.endTime)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
 
               {/* Free slots */}
               {daySlots.map((slot, i) => (

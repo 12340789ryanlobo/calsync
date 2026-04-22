@@ -14,6 +14,27 @@ export default function DashboardClient() {
   const { settings } = useSettings();
   const freeSlots = useFreeSlots(events, settings, weekOffset);
   const [calendars, setCalendars] = useState<ConnectedCalendarRow[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  async function syncNow() {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const res = await fetch("/api/sync-now", { method: "POST" });
+      if (!res.ok) throw new Error(`sync failed: ${res.status}`);
+      const result = await res.json();
+      if (result.errors?.length > 0) {
+        setSyncError(result.errors[0]);
+      }
+      setLastSync(new Date());
+    } catch (e) {
+      setSyncError((e as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -41,14 +62,31 @@ export default function DashboardClient() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-        <p className="mt-1 text-slate-500">
-          Your week at a glance &middot; Free between{" "}
-          <span className="font-medium text-indigo-600">
-            {formatTime(settings.workingHoursStart)}–{formatTime(settings.workingHoursEnd)}
-          </span>
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+          <p className="mt-1 text-slate-500">
+            Your week at a glance &middot; Free between{" "}
+            <span className="font-medium text-indigo-600">
+              {formatTime(settings.workingHoursStart)}–{formatTime(settings.workingHoursEnd)}
+            </span>
+          </p>
+          {syncError && (
+            <p className="mt-1 text-xs text-red-500">Sync error: {syncError}</p>
+          )}
+          {lastSync && !syncError && (
+            <p className="mt-1 text-xs text-slate-400">
+              Last synced {lastSync.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={syncNow}
+          disabled={syncing}
+          className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {syncing ? "Syncing..." : "Sync now"}
+        </button>
       </div>
 
       {/* Stats */}
