@@ -9,12 +9,8 @@ const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 export async function getUserSupabase() {
   const { getToken, userId } = await auth();
   if (!userId) throw new Error("Not signed in");
-  const token = await getToken({ template: "supabase" });
   return createClient(url, anon, {
-    global: {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    },
-    auth: { persistSession: false, autoRefreshToken: false },
+    accessToken: async () => (await getToken()) ?? null,
   });
 }
 
